@@ -2,5 +2,5 @@
 
 
 2.项目功能：导入自己选择的单词和中文来进行辅助记忆。
-<img width="1354" height="1205" alt="en-1" src="https://github.com/user-attachments/assets/c20b9d27-760e-48f2-99dd-4e08f48a2990" />
-<img width="1814" height="1098" alt="en-2" src="https://github.com/user-attachments/assets/f1798b0e-59f7-4664-8936-c65fbf632c48" />
+<img width="1354" height="1205" alt="en-1" src="https://github.com/user-attachments/assets/21038b22-4561-4534-af12-bb2233454259" />
+<img width="1814" height="1098" alt="en-2" src="https://github.com/user-attachments/assets/f3d69064-c692-49d4-9a43-9a4eccab666f" />
