@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>单词记忆助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+  <div class="max-w-4xl mx-auto p-6">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
+        <i class="fas fa-brain text-blue-600"></i>
+        单词记忆助手
+      </h1>
+      <div class="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full flex items-center gap-1">
+        <i class="fas fa-database"></i>
+        <span>数据已本地保存</span>
+      </div>
+    </div>
+
+    <div class="flex gap-3 mb-6">
+      <button onclick="showWordManager()" class="px-4 py-2 bg-white shadow rounded-xl text-sm flex items-center gap-2 hover:bg-gray-50">
+        <i class="fas fa-book"></i> 管理数据库
+      </button>
+      <button onclick="showHistory()" class="px-4 py-2 bg-white shadow rounded-xl text-sm flex items-center gap-2 hover:bg-gray-50">
+        <i class="fas fa-history"></i> 错题集
+      </button>
+    </div>
+
+    <!-- 单词列表输入 -->
+    <div class="bg-white rounded-2xl shadow p-6 mb-6">
+      <h2 class="font-semibold mb-3">单词列表</h2>
+      <textarea id="wordListInput" rows="8" 
+                placeholder="每行一个单词 + 释义，例如：&#10;grep -rn    递归搜索包含指定字符串的文件"
+                class="w-full border rounded-xl p-3 text-sm font-mono"></textarea>
+      
+      <button onclick="parseWordList()" 
+              class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-medium">
+        解析单词列表
+      </button>
+
+      <!-- 解析结果 -->
+      <div id="parseResult" class="hidden mt-4">
+        <div class="text-sm font-medium mb-2">已解析出 <span id="parsedCount" class="text-indigo-600 font-bold"></span> 个单词</div>
+        <div id="parsedList" class="max-h-40 overflow-auto border rounded-xl p-3 text-sm bg-gray-50 mb-3"></div>
+        
+        <div class="flex gap-2">
+          <button onclick="startPracticeFromParsed()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium">直接练习</button>
+          <button onclick="saveCurrentToHistory()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-medium">保存到历史</button>
+        </div>
+      </div>
+
+      <!-- 分组选择 -->
+      <div id="groupSelection" class="hidden mt-4">
+        <div class="mb-2 font-medium text-gray-700">
+          已解析 <span id="totalParsedCount"></span> 个，共 <span id="totalGroupCount"></span> 组
+        </div>
+        <div id="groupList" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- 练习界面 -->
+    <div id="practiceSection" class="hidden bg-white rounded-3xl shadow-lg p-8">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <span class="text-sm text-gray-500" id="practiceTitle">练习中</span>
+          <div id="progress" class="text-2xl font-bold text-gray-800"></div>
+        </div>
+        <button onclick="endPractice()" class="text-sm text-red-500 hover:text-red-600">结束练习</button>
+      </div>
+
+      <div class="text-center mb-8">
+        <div id="currentWord" class="text-5xl font-bold text-gray-900 min-h-[80px]"></div>
+      </div>
+
+      <div class="max-w-md mx-auto">
+        <div class="flex gap-2">
+          <input id="answerInput" type="text" placeholder="请输入中文释义" 
+                 class="flex-1 border rounded-2xl px-5 py-4 text-lg" onkeypress="if(event.key==='Enter') submitAnswer()">
+          <button onclick="submitAnswer()" class="px-8 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-2xl">提交</button>
+        </div>
+
+        <div id="feedbackArea" class="mt-4 hidden">
+          <div id="feedbackMessage" class="text-center p-3 rounded-2xl text-sm font-medium mb-3"></div>
+          <div class="flex gap-3">
+            <button id="showAnswerBtn" onclick="showCorrectAnswer()" class="flex-1 py-3 bg-amber-500 text-white rounded-2xl text-sm hidden">查看正确答案</button>
+            <button id="nextQuestionBtn" onclick="goToNextQuestion()" class="flex-1 py-3 bg-blue-600 text-white rounded-2xl text-sm hidden">下一题</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 text-center">
+        <button onclick="editCurrentPracticeGroup()" class="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-sm font-medium">
+          <i class="fas fa-edit mr-2"></i>编辑本组单词
+        </button>
+      </div>
+    </div>
+
+    <!-- 练习结果 -->
+    <div id="resultSection" class="hidden bg-white rounded-2xl shadow p-6 mt-6">
+      <h3 class="text-xl font-semibold mb-4">练习完成</h3>
+      <div id="resultContent" class="mb-4 text-gray-700"></div>
+      <div id="groupSelectAfterPractice" class="hidden">
+        <div class="text-sm font-medium mb-2 text-gray-600">请选择下一组继续练习：</div>
+        <div id="groupSelectButtons" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 历史记录弹窗（只显示保存列表） -->
+  <!-- 错题集弹窗（历史记录入口） -->
+  <div id="historyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-2xl mx-4 rounded-2xl p-6 max-h-[85vh] overflow-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold">错题集</h3>
+        <button onclick="hideHistoryModal()" class="text-gray-400 text-2xl">×</button>
+      </div>
+
+      <div id="wrongSetsList" class="space-y-2 text-sm"></div>
+      <div id="wrongSetsEmpty" class="text-gray-400 text-sm py-4 text-center hidden">暂无错题集</div>
+    </div>
+  </div>
+  <!-- 编辑弹窗 -->
+  <div id="editModal" onclick="hideEditModal()" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-2xl mx-4 rounded-2xl p-6 max-h-[80vh] overflow-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold" id="editModalTitle">编辑</h3>
+        <button onclick="hideEditModal()" class="text-gray-400 text-2xl">×</button>
+      </div>
+      <div id="editModalContent" class="space-y-3 mb-4"></div>
+      <div class="border-t pt-4 mt-4">
+        <div class="text-sm font-medium mb-2">添加新单词</div>
+        <div class="flex gap-2">
+          <input id="editNewWord" type="text" placeholder="英文" class="flex-1 border rounded-lg px-3 py-2">
+          <input id="editNewMeaning" type="text" placeholder="中文" class="flex-1 border rounded-lg px-3 py-2">
+          <button onclick="addWordToEditModal()" class="px-4 bg-green-600 text-white rounded-lg">添加</button>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-6">
+        <button onclick="hideEditModal()" class="px-5 py-2 bg-gray-200 rounded-lg">取消</button>
+        <button onclick="saveEditModalChanges()" id="editModalSaveBtn" class="px-5 py-2 bg-blue-600 text-white rounded-lg">保存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理数据库弹窗（仅保存列表） -->
+  <div id="wordManagerModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div onclick="event.stopPropagation()" class="bg-white w-full max-w-2xl mx-4 rounded-2xl p-6 max-h-[85vh] overflow-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold">管理数据库</h3>
+        <button onclick="hideWordManagerModal()" class="text-gray-400 text-2xl">×</button>
+      </div>
+
+      <div id="managerSavedLists" class="space-y-2 text-sm"></div>
+      <div id="managerSavedEmpty" class="text-gray-400 text-sm py-4 text-center hidden">暂无保存的列表</div>
+
+      <div class="text-xs text-gray-400 mt-3">双击列表可直接开始练习</div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== 数据 ====================
+    let vocabulary = [];
+    let practiceHistory = [];
+    let reviewSets = [];
+    let savedLists = [];
+
+    let parsedWords = [];
+    let wordGroups = [];
+    let currentGroupIndex = null;
+
+    let practiceList = [];
+    let wrongWordsThisSession = [];
+    let currentIndex = 0;
+    let correctCount = 0;
+    let currentWordObj = null;
+    let isReviewMode = false;
+    let savedPracticeList = [];  // 保存当前练习组，用于重新练习
+
+    let currentEditingListIndex = null;
+    let currentEditingType = null; // 'saved' | 'review'
+    let practiceSource = null; // 'saved' | 'review' | 'parsed'
+    let practiceSourceIndex = null;
+
+    function loadData() {
+      vocabulary = JSON.parse(localStorage.getItem('vocabulary')) || [];
+      practiceHistory = JSON.parse(localStorage.getItem('practiceHistory')) || [];
+      reviewSets = JSON.parse(localStorage.getItem('reviewSets')) || [];
+      savedLists = JSON.parse(localStorage.getItem('savedLists')) || [];
+    }
+
+    function saveData() {
+      localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
+      localStorage.setItem('practiceHistory', JSON.stringify(practiceHistory));
+      localStorage.setItem('reviewSets', JSON.stringify(reviewSets));
+      localStorage.setItem('savedLists', JSON.stringify(savedLists));
+    }
+
+    function init() {
+      loadData();
+      vocabulary.forEach(w => {
+        if (w.wrongCount === undefined) w.wrongCount = 0;
+        if (w.totalAttempts === undefined) w.totalAttempts = 0;
+      });
+      saveData();
+    }
+
+    // ==================== 解析单词列表 ====================
+    function parseWordList() {
+      const text = document.getElementById('wordListInput').value.trim();
+      if (!text) return;
+
+      const lines = text.split('\n').filter(l => l.trim());
+      parsedWords = [];
+
+      lines.forEach(line => {
+        let word = '', meaning = '';
+        const parts = line.split(/\s{2,}|\t/);
+
+        if (parts.length >= 2) {
+          word = parts[0].trim();
+          meaning = parts.slice(1).join(' ').trim();
+        } else {
+          const match = line.match(/^(.+?)\s+[-:：]\s+(.+)$/);
+          if (match) {
+            word = match[1].trim();
+            meaning = match[2].trim();
+          } else {
+            const firstSpace = line.indexOf(' ');
+            if (firstSpace > 0) {
+              word = line.substring(0, firstSpace).trim();
+              meaning = line.substring(firstSpace + 1).trim();
+            }
+          }
+        }
+
+        if (word && meaning) {
+          parsedWords.push({ word, meaning, wrongCount: 0, totalAttempts: 0 });
+        }
+      });
+
+      if (parsedWords.length === 0) return;
+
+      document.getElementById('parseResult').classList.remove('hidden');
+      document.getElementById('parsedCount').textContent = parsedWords.length;
+      document.getElementById('groupSelection').classList.add('hidden');
+
+      const container = document.getElementById('parsedList');
+      container.innerHTML = '';
+      parsedWords.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex justify-between py-1 border-b last:border-none';
+        div.innerHTML = `<div><b>${item.word}</b> <span class="text-gray-500">${item.meaning}</span></div>
+                         <button onclick="removeParsedWord(${i})" class="text-red-400 text-xs">删除</button>`;
+        container.appendChild(div);
+      });
+    }
+
+    function removeParsedWord(i) {
+      parsedWords.splice(i, 1);
+      document.getElementById('parsedCount').textContent = parsedWords.length;
+    }
+
+    // ==================== 保存到历史 ====================
+    function saveCurrentToHistory() {
+      if (parsedWords.length === 0) return;
+
+      let maxNum = 0;
+      savedLists.forEach(list => {
+        const match = list.name.match(/列表_(\d+)/);
+        if (match) maxNum = Math.max(maxNum, parseInt(match[1]));
+      });
+
+      const newName = `列表_${String(maxNum + 1).padStart(2, '0')}`;
+
+      savedLists.push({
+        id: Date.now().toString(),
+        name: newName,
+        words: JSON.parse(JSON.stringify(parsedWords))
+      });
+
+      saveData();
+      confirm(`已保存为 ${newName}`);
+    }
+
+    // ==================== 历史记录弹窗（仅显示保存列表） ====================
+    function showHistory() {
+      document.getElementById('historyModal').classList.remove('hidden');
+      renderWrongSetsList();
+    }
+
+    function hideHistoryModal() {
+      document.getElementById('historyModal').classList.add('hidden');
+    }
+
+    // Backdrop click closes modal (check target is the backdrop itself)
+    document.addEventListener('click', function backdropClose(e) {
+      const modal = document.getElementById('historyModal');
+      if (modal.classList.contains('hidden')) return;
+      if (e.target === modal) hideHistoryModal();
+    });
+    document.addEventListener('click', function backdropCloseWM(e) {
+      const modal = document.getElementById('wordManagerModal');
+      if (modal.classList.contains('hidden')) return;
+      if (e.target === modal) hideWordManagerModal();
+    });
+
+    function renderWrongSetsList() {
+      const container = document.getElementById('wrongSetsList');
+      const empty = document.getElementById('wrongSetsEmpty');
+
+      if (reviewSets.length === 0) {
+        container.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      container.classList.remove('hidden');
+      container.innerHTML = '';
+
+      reviewSets.forEach((set, index) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between bg-red-50 p-3 rounded-xl border';
+        item.dataset.index = index;
+        item.innerHTML = `
+          <div class="flex-1">
+            <span class="font-medium">${set.name}</span>
+            <span class="text-xs text-red-400 ml-2">(${set.words.length} 个错题)</span>
+          </div>
+          <div class="flex gap-1">
+            <button class="text-sm bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg border border-blue-200 text-blue-600 btn-practice">练习</button>
+            <button class="text-sm bg-white hover:bg-gray-100 px-3 py-1 rounded-lg border btn-rename">重命名</button>
+            <button class="text-sm bg-white hover:bg-gray-100 px-3 py-1 rounded-lg border btn-edit">编辑</button>
+            <button class="text-red-400 hover:text-red-600 px-2 text-lg btn-delete">×</button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    document.getElementById('wrongSetsList').addEventListener('click', function(e) {
+      const btn = e.target.closest('button');
+      if (!btn || !btn.parentElement) return;
+      const item = btn.closest('[data-index]');
+      if (!item) return;
+      const idx = parseInt(item.dataset.index);
+
+      if (btn.classList.contains('btn-practice')) {
+        startReviewSetPractice(idx);
+        hideHistoryModal();
+      } else if (btn.classList.contains('btn-rename')) {
+        renameReviewSet(idx);
+      } else if (btn.classList.contains('btn-edit')) {
+        editReviewSet(idx);
+      } else if (btn.classList.contains('btn-delete')) {
+        deleteReviewSet(idx);
+      }
+    });
+
+    function renameReviewSet(index) {
+      const currentName = reviewSets[index].name;
+      const newName = prompt('请输入新的名称：', currentName);
+      if (newName && newName.trim() && newName.trim() !== currentName) {
+        reviewSets[index].name = newName.trim();
+        saveData();
+        renderWrongSetsList();
+      }
+    }
+
+    function editReviewSet(index) {
+      currentEditingListIndex = index;
+      currentEditingType = 'review';
+      document.getElementById('editModalTitle').textContent = `编辑 ${reviewSets[index].name}`;
+      document.getElementById('editModal').classList.remove('hidden');
+      renderEditModalContentForReview();
+    }
+
+    function renderEditModalContentForReview() {
+      const container = document.getElementById('editModalContent');
+      container.innerHTML = '';
+      const list = reviewSets[currentEditingListIndex];
+
+      list.words.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex gap-2 items-center bg-gray-50 p-2 rounded-lg';
+        div.dataset.index = i;
+        div.innerHTML = `
+          <input type="text" value="${item.word}" class="flex-1 border rounded px-2 py-1 text-sm" data-index="${i}" data-field="word">
+          <input type="text" value="${item.meaning}" class="flex-1 border rounded px-2 py-1 text-sm" data-index="${i}" data-field="meaning">
+          <button class="text-red-400 hover:text-red-600 px-2 btn-del">×</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteReviewSet(index) {
+      if (confirm(`确定删除 ${reviewSets[index].name} 吗？`)) {
+        reviewSets.splice(index, 1);
+        saveData();
+        renderWrongSetsList();
+      }
+    }
+
+    function startReviewSetPractice(index) {
+      const src = 'review';
+      const srcIdx = index;
+      parsedWords = JSON.parse(JSON.stringify(reviewSets[index].words));
+      if (parsedWords.length > 10) {
+        wordGroups = createGroups(parsedWords, 10);
+        wordGroups._source = src;
+        wordGroups._sourceIdx = srcIdx;
+        showGroupSelectionFromHistory();
+      } else {
+        wordGroups = [];
+        practiceList = JSON.parse(JSON.stringify(parsedWords));
+        savedPracticeList = JSON.parse(JSON.stringify(practiceList));
+        document.getElementById('practiceSection').classList.remove('hidden');
+        document.getElementById('practiceTitle').textContent = reviewSets[index].name;
+        resetPracticeStateForGroup();
+        practiceSource = src;
+        practiceSourceIndex = srcIdx;
+        loadNextWord();
+      }
+    }
+
+    // ==================== 练习核心功能 ====================
+    function createGroups(words, groupSize = 10) {
+      const groups = [];
+      for (let i = 0; i < words.length; i += groupSize) {
+        groups.push(words.slice(i, i + groupSize));
+      }
+      return groups;
+    }
+
+    function startGroupPractice(groupIndex, src, srcIdx) {
+      currentGroupIndex = groupIndex;
+      practiceList = JSON.parse(JSON.stringify(wordGroups[groupIndex]));
+      savedPracticeList = JSON.parse(JSON.stringify(practiceList));
+      document.getElementById('groupSelection').classList.add('hidden');
+      document.getElementById('practiceSection').classList.remove('hidden');
+      document.getElementById('practiceTitle').textContent = `第 ${groupIndex + 1} 组练习`;
+      resetPracticeStateForGroup();
+      if (src !== undefined && srcIdx !== undefined) {
+        practiceSource = src;
+        practiceSourceIndex = srcIdx;
+      } else {
+        practiceSource = wordGroups._source || 'parsed';
+        practiceSourceIndex = wordGroups._sourceIdx !== undefined ? wordGroups._sourceIdx : null;
+      }
+      loadNextWord();
+    }
+
+    function resetPracticeStateForGroup() {
+      currentIndex = 0;
+      correctCount = 0;
+      wrongWordsThisSession = [];
+      isReviewMode = false;
+    }
+
+    function loadNextWord() {
+      if (currentIndex >= practiceList.length) {
+        finishGroupPractice();
+        return;
+      }
+      currentWordObj = practiceList[currentIndex];
+      document.getElementById('currentWord').textContent = currentWordObj.word;
+      document.getElementById('progress').textContent = `${currentIndex + 1} / ${practiceList.length}`;
+
+      const input = document.getElementById('answerInput');
+      input.value = '';
+      input.disabled = false;
+      input.focus();
+
+      document.getElementById('feedbackArea').classList.add('hidden');
+      document.getElementById('showAnswerBtn').classList.add('hidden');
+      document.getElementById('nextQuestionBtn').classList.add('hidden');
+    }
+
+    function submitAnswer() {
+      const input = document.getElementById('answerInput');
+      const answer = input.value.trim();
+
+      const feedbackArea = document.getElementById('feedbackArea');
+      const msg = document.getElementById('feedbackMessage');
+      feedbackArea.classList.remove('hidden');
+
+      currentWordObj.totalAttempts = (currentWordObj.totalAttempts || 0) + 1;
+
+      if (!answer) {
+        if (!wrongWordsThisSession.some(w => w.word === currentWordObj.word)) {
+          wrongWordsThisSession.push(currentWordObj);
+        }
+        currentWordObj.wrongCount = (currentWordObj.wrongCount || 0) + 1;
+        msg.innerHTML = `<span class="text-red-600">✗ 答案不能为空</span>`;
+        msg.className = 'text-center p-3 rounded-2xl text-sm font-medium bg-red-100 text-red-700';
+        input.disabled = true;
+        document.getElementById('showAnswerBtn').classList.remove('hidden');
+        return;
+      }
+
+      input.disabled = true;
+
+      const u = answer.replace(/[\s，。、！？]/g, '').toLowerCase();
+      const c = currentWordObj.meaning.replace(/[\s，。、！？]/g, '').toLowerCase();
+
+      if (u === c || c.includes(u) || u.includes(c)) {
+        correctCount++;
+        msg.innerHTML = `<span class="text-green-600">✓ 正确！</span>`;
+        msg.className = 'text-center p-3 rounded-2xl text-sm font-medium bg-green-100 text-green-700';
+        setTimeout(() => { currentIndex++; loadNextWord(); }, 900);
+      } else {
+        if (!wrongWordsThisSession.some(w => w.word === currentWordObj.word)) {
+          wrongWordsThisSession.push(currentWordObj);
+        }
+        currentWordObj.wrongCount = (currentWordObj.wrongCount || 0) + 1;
+        msg.innerHTML = `<span class="text-red-600">✗ 错误</span>`;
+        msg.className = 'text-center p-3 rounded-2xl text-sm font-medium bg-red-100 text-red-700';
+        document.getElementById('showAnswerBtn').classList.remove('hidden');
+      }
+      saveData();
+    }
+
+    function showCorrectAnswer() {
+      document.getElementById('feedbackMessage').innerHTML = `<span class="text-red-600">正确答案：</span> <span class="font-medium">${currentWordObj.meaning}</span>`;
+      document.getElementById('showAnswerBtn').classList.add('hidden');
+      document.getElementById('nextQuestionBtn').classList.remove('hidden');
+    }
+
+    function goToNextQuestion() {
+      document.getElementById('nextQuestionBtn').classList.add('hidden');
+      currentIndex++;
+      loadNextWord();
+    }
+
+    function finishGroupPractice() {
+      document.getElementById('practiceSection').classList.add('hidden');
+
+      const resultSection = document.getElementById('resultSection');
+      const content = document.getElementById('resultContent');
+      const groupSelect = document.getElementById('groupSelectAfterPractice');
+
+      const accuracy = Math.round((correctCount / practiceList.length) * 100);
+
+      content.innerHTML = `
+        <div class="text-lg">第 ${currentGroupIndex + 1} 组练习完成</div>
+        <div class="mt-1">正确率：<span class="font-bold text-2xl">${accuracy}%</span>（${correctCount}/${practiceList.length}）</div>
+        <div class="mt-4 flex gap-3 flex-wrap">
+          <button onclick="restartCurrentGroup()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium">重新练习</button>
+          ${wrongWordsThisSession.length > 0 ? `<button data-save-review-btn onclick="saveAsReviewSet()" class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium">保存为错题集（${wrongWordsThisSession.length}个）</button>` : ''}
+        </div>
+        <div id="saveReviewTip" class="mt-3 text-sm text-gray-400"></div>
+      `;
+      resultSection.classList.remove('hidden');
+      groupSelect.classList.add('hidden');
+
+      if (wordGroups.length > 1) {
+        showGroupSelectionAfterPractice();
+      }
+    }
+
+    function restartCurrentGroup() {
+      document.getElementById('resultSection').classList.add('hidden');
+      if (savedPracticeList.length > 0) {
+        practiceList = JSON.parse(JSON.stringify(savedPracticeList));
+      } else {
+        practiceList = JSON.parse(JSON.stringify(wordGroups[currentGroupIndex]));
+        savedPracticeList = JSON.parse(JSON.stringify(practiceList));
+      }
+      document.getElementById('practiceSection').classList.remove('hidden');
+      resetPracticeStateForGroup();
+      loadNextWord();
+    }
+
+    function showGroupSelectionAfterPractice() {
+      const container = document.getElementById('groupSelectButtons');
+      const groupSelect = document.getElementById('groupSelectAfterPractice');
+      container.innerHTML = '';
+
+      wordGroups.forEach((group, index) => {
+        const btn = document.createElement('button');
+        btn.className = `px-4 py-2 rounded-lg text-sm border ${index === currentGroupIndex ? 'bg-gray-200' : 'bg-white hover:bg-gray-50'}`;
+        btn.textContent = `第 ${index + 1} 组 (${group.length}个)`;
+        btn.onclick = () => {
+          document.getElementById('resultSection').classList.add('hidden');
+          startGroupPractice(index, wordGroups._source, wordGroups._sourceIdx);
+        };
+        container.appendChild(btn);
+      });
+      groupSelect.classList.remove('hidden');
+    }
+
+    function endPractice() {
+      if (confirm('确定结束当前练习？')) {
+        document.getElementById('practiceSection').classList.add('hidden');
+        document.getElementById('resultSection').classList.add('hidden');
+        if (wordGroups.length > 0) {
+          document.getElementById('groupSelection').classList.remove('hidden');
+        }
+      }
+    }
+
+    function editCurrentPracticeGroup() {
+      currentEditingListIndex = practiceSourceIndex;
+      currentEditingType = 'practice';
+      const title = practiceSource === 'parsed' ? '当前练习组'
+        : (practiceSource === 'review' ? reviewSets[practiceSourceIndex].name : savedLists[practiceSourceIndex].name);
+      document.getElementById('editModalTitle').textContent = `编辑 ${title}`;
+      document.getElementById('editModalSaveBtn').onclick = savePracticeEditChanges;
+      document.getElementById('editModal').classList.remove('hidden');
+      renderEditModalContentForCurrentPractice();
+    }
+
+    function renderEditModalContentForCurrentPractice() {
+      const container = document.getElementById('editModalContent');
+      container.innerHTML = '';
+
+      practiceList.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex gap-2 items-center bg-gray-50 p-2 rounded-lg';
+        div.dataset.index = i;
+        div.innerHTML = `
+          <input type="text" value="${item.word}" class="flex-1 border rounded px-2 py-1 text-sm" data-index="${i}" data-field="word">
+          <input type="text" value="${item.meaning}" class="flex-1 border rounded px-2 py-1 text-sm" data-index="${i}" data-field="meaning">
+          <button class="text-red-400 hover:text-red-600 px-2 btn-del">×</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteFromPracticeEdit(index) {
+      practiceList.splice(index, 1);
+      renderEditModalContentForCurrentPractice();
+    }
+
+    function savePracticeEditChanges() {
+      const container = document.getElementById('editModalContent');
+      const inputs = container.querySelectorAll('input');
+      const newWords = [];
+
+      const map = {};
+      inputs.forEach(input => {
+        const idx = input.dataset.index;
+        const field = input.dataset.field;
+        if (!map[idx]) map[idx] = {};
+        map[idx][field] = input.value.trim();
+      });
+
+      Object.values(map).forEach(item => {
+        if (item.word && item.meaning) {
+          newWords.push({ word: item.word, meaning: item.meaning, wrongCount: 0, totalAttempts: 0 });
+        }
+      });
+
+      practiceList = newWords;
+
+      if (currentEditingType === 'practice') {
+        if (practiceSource === 'saved' && practiceSourceIndex !== null) {
+          savedLists[practiceSourceIndex].words = JSON.parse(JSON.stringify(newWords));
+        } else if (practiceSource === 'review' && practiceSourceIndex !== null) {
+          reviewSets[practiceSourceIndex].words = JSON.parse(JSON.stringify(newWords));
+        }
+      } else if (currentEditingType === 'saved' && currentEditingListIndex !== null) {
+        savedLists[currentEditingListIndex].words = JSON.parse(JSON.stringify(newWords));
+      } else if (currentEditingType === 'review' && currentEditingListIndex !== null) {
+        reviewSets[currentEditingListIndex].words = JSON.parse(JSON.stringify(newWords));
+      }
+
+      saveData();
+      hideEditModal();
+
+      if (currentIndex >= practiceList.length && practiceList.length > 0) {
+        currentIndex = practiceList.length - 1;
+      }
+      loadNextWord();
+    }
+
+    function saveAsReviewSet() {
+      if (wrongWordsThisSession.length === 0) return;
+      let maxNum = 0;
+      reviewSets.forEach(set => {
+        const match = set.name.match(/错题_(\d+)/);
+        if (match) maxNum = Math.max(maxNum, parseInt(match[1]));
+      });
+      const newName = `错题_${String(maxNum + 1).padStart(2, '0')}`;
+      reviewSets.push({ id: Date.now().toString(), name: newName, words: JSON.parse(JSON.stringify(wrongWordsThisSession)) });
+      saveData();
+
+      // 显示保存成功提示
+      const btn = document.querySelector('[data-save-review-btn]');
+      if (btn) {
+        btn.disabled = true;
+        btn.className = 'px-6 py-2 bg-green-500 text-white rounded-xl font-medium cursor-default';
+        btn.textContent = '✓ 已保存';
+      }
+      const tip = document.getElementById('saveReviewTip');
+      if (tip) {
+        tip.textContent = `已保存为 ${newName}，共 ${wrongWordsThisSession.length} 个单词`;
+        tip.className = 'mt-3 text-sm text-green-600 font-medium';
+      }
+    }
+
+    function generateReviewSet(wrongWords) {
+      if (wrongWords.length === 0) return;
+      let maxNum = 0;
+      reviewSets.forEach(set => {
+        const match = set.name.match(/错题_(\d+)/);
+        if (match) maxNum = Math.max(maxNum, parseInt(match[1]));
+      });
+      const newName = `错题_${String(maxNum + 1).padStart(2, '0')}`;
+      reviewSets.push({ id: Date.now().toString(), name: newName, words: JSON.parse(JSON.stringify(wrongWords)) });
+      saveData();
+    }
+
+    function showWordManager() {
+      document.getElementById('wordManagerModal').classList.remove('hidden');
+      renderManagerSavedLists();
+    }
+
+    function hideWordManagerModal() {
+      document.getElementById('wordManagerModal').classList.add('hidden');
+    }
+
+    function renderManagerSavedLists() {
+      const container = document.getElementById('managerSavedLists');
+      const empty = document.getElementById('managerSavedEmpty');
+      container.innerHTML = '';
+
+      if (savedLists.length === 0) {
+        container.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      savedLists.forEach((list, index) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between bg-emerald-50 p-3 rounded-xl border';
+        item.dataset.index = index;
+        item.innerHTML = `
+          <div class="flex-1">
+            <span class="font-medium">${list.name}</span>
+            <span class="text-xs text-emerald-500 ml-2">(${list.words.length} 个)</span>
+          </div>
+          <div class="flex gap-1">
+            <button class="text-sm bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg border border-blue-200 text-blue-600 btn-practice">练习</button>
+            <button class="text-sm bg-white hover:bg-gray-100 px-3 py-1 rounded-lg border btn-rename">重命名</button>
+            <button class="text-sm bg-white hover:bg-gray-100 px-3 py-1 rounded-lg border btn-edit">编辑</button>
+            <button class="text-red-400 hover:text-red-600 px-2 text-lg btn-delete">×</button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    document.getElementById('managerSavedLists').addEventListener('click', function(e) {
+      const btn = e.target.closest('button');
+      if (!btn || !btn.parentElement) return;
+      const item = btn.closest('[data-index]');
+      if (!item) return;
+      const idx = parseInt(item.dataset.index);
+
+      if (btn.classList.contains('btn-practice')) {
+        startSavedListPractice(idx);
+        hideWordManagerModal();
+      } else if (btn.classList.contains('btn-rename')) {
+        renameSavedList(idx);
+        renderManagerSavedLists();
+      } else if (btn.classList.contains('btn-edit')) {
+        editSavedList(idx);
+      } else if (btn.classList.contains('btn-delete')) {
+        deleteSavedList(idx);
+        renderManagerSavedLists();
+      }
+    });
+
+    function editSavedList(index) {
+      currentEditingListIndex = index;
+      currentEditingType = 'saved';
+      document.getElementById('editModalTitle').textContent = `编辑 ${savedLists[index].name}`;
+      document.getElementById('editModal').classList.remove('hidden');
+      renderEditModalContent();
+    }
+
+    function renderEditModalContent() {
+      const container = document.getElementById('editModalContent');
+      container.innerHTML = '';
+      const list = savedLists[currentEditingListIndex];
+
+      list.words.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex gap-2 items-center bg-gray-50 p-2 rounded-lg';
+        div.dataset.index = i;
+        div.innerHTML = `
+          <input type="text" value="${item.word}" class="flex-1 border rounded px-2 py-1 text-sm" data-index="${i}" data-field="word">
+          <input type="text" value="${item.meaning}" class="flex-1 border rounded px-2 py-1 text-sm" data-index="${i}" data-field="meaning">
+          <button class="text-red-400 hover:text-red-600 px-2 btn-del">×</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    document.getElementById('editModalContent').addEventListener('click', function(e) {
+      if (e.target.classList.contains('btn-del')) {
+        const row = e.target.closest('[data-index]');
+        if (!row) return;
+        deleteFromEditModal(parseInt(row.dataset.index));
+      }
+    });
+
+    function deleteFromEditModal(index) {
+      if (currentEditingType === 'review') {
+        reviewSets[currentEditingListIndex].words.splice(index, 1);
+        renderEditModalContentForReview();
+      } else if (currentEditingType === 'practice') {
+        practiceList.splice(index, 1);
+        renderEditModalContentForCurrentPractice();
+      } else {
+        savedLists[currentEditingListIndex].words.splice(index, 1);
+        renderEditModalContent();
+      }
+    }
+
+    function addWordToEditModal() {
+      const word = document.getElementById('editNewWord').value.trim();
+      const meaning = document.getElementById('editNewMeaning').value.trim();
+      if (!word || !meaning) return;
+
+      const newWord = { word, meaning, wrongCount: 0, totalAttempts: 0 };
+      if (currentEditingType === 'review') {
+        reviewSets[currentEditingListIndex].words.push(newWord);
+        renderEditModalContentForReview();
+      } else {
+        savedLists[currentEditingListIndex].words.push(newWord);
+        renderEditModalContent();
+      }
+
+      document.getElementById('editNewWord').value = '';
+      document.getElementById('editNewMeaning').value = '';
+    }
+
+    function saveEditModalChanges() {
+      const container = document.getElementById('editModalContent');
+      const inputs = container.querySelectorAll('input');
+      const words = [];
+
+      const map = {};
+      inputs.forEach(input => {
+        const idx = input.dataset.index;
+        const field = input.dataset.field;
+        if (!map[idx]) map[idx] = {};
+        map[idx][field] = input.value.trim();
+      });
+
+      Object.values(map).forEach(item => {
+        if (item.word && item.meaning) {
+          words.push({ word: item.word, meaning: item.meaning, wrongCount: 0, totalAttempts: 0 });
+        }
+      });
+
+      if (currentEditingType === 'practice') {
+        if (practiceSource === 'saved' && practiceSourceIndex !== null) {
+          savedLists[practiceSourceIndex].words = JSON.parse(JSON.stringify(words));
+        } else if (practiceSource === 'review' && practiceSourceIndex !== null) {
+          reviewSets[practiceSourceIndex].words = JSON.parse(JSON.stringify(words));
+        }
+      } else if (currentEditingType === 'review') {
+        reviewSets[currentEditingListIndex].words = words;
+      } else {
+        savedLists[currentEditingListIndex].words = words;
+      }
+
+      saveData();
+      hideEditModal();
+      if (currentEditingType === 'review') {
+        renderWrongSetsList();
+      } else {
+        renderManagerSavedLists();
+      }
+    }
+
+    function deleteSavedList(index) {
+      if (confirm(`确定删除 ${savedLists[index].name} 吗？`)) {
+        savedLists.splice(index, 1);
+        saveData();
+      }
+    }
+
+    function renameSavedList(index) {
+      const currentName = savedLists[index].name;
+      const newName = prompt('请输入新的名称：', currentName);
+      if (newName && newName.trim() && newName.trim() !== currentName) {
+        savedLists[index].name = newName.trim();
+        saveData();
+        renderManagerSavedLists();
+      }
+    }
+
+    function hideEditModal() {
+      document.getElementById('editModal').classList.add('hidden');
+      currentEditingListIndex = null;
+      currentEditingType = null;
+      // 不再重置 practiceSource / practiceSourceIndex，保证编辑后还能继续编辑
+    }
+
+    function startPracticeFromParsed() {
+      if (parsedWords.length === 0) return;
+
+      if (parsedWords.length > 10) {
+        wordGroups = createGroups(parsedWords, 10);
+        wordGroups._source = 'parsed';
+        wordGroups._sourceIdx = null;
+        showGroupSelectionFromHistory();
+      } else {
+        wordGroups = [];
+        practiceList = JSON.parse(JSON.stringify(parsedWords));
+        savedPracticeList = JSON.parse(JSON.stringify(practiceList));
+        document.getElementById('parseResult').classList.add('hidden');
+        document.getElementById('practiceSection').classList.remove('hidden');
+        document.getElementById('practiceTitle').textContent = '直接练习';
+        resetPracticeStateForGroup();
+        practiceSource = 'parsed';
+        practiceSourceIndex = null;
+        loadNextWord();
+      }
+    }
+
+    function startSavedListPractice(index) {
+      const list = savedLists[index];
+      parsedWords = JSON.parse(JSON.stringify(list.words));
+
+      if (parsedWords.length > 10) {
+        wordGroups = createGroups(parsedWords, 10);
+        wordGroups._source = 'saved';
+        wordGroups._sourceIdx = index;
+        showGroupSelectionFromHistory();
+      } else {
+        wordGroups = [];
+        practiceList = JSON.parse(JSON.stringify(parsedWords));
+        savedPracticeList = JSON.parse(JSON.stringify(practiceList));
+        document.getElementById('practiceSection').classList.remove('hidden');
+        document.getElementById('practiceTitle').textContent = list.name;
+        resetPracticeStateForGroup();
+        practiceSource = 'saved';
+        practiceSourceIndex = index;
+        loadNextWord();
+      }
+    }
+
+    function showGroupSelectionFromHistory() {
+      document.getElementById('parseResult').classList.add('hidden');
+      const groupSelection = document.getElementById('groupSelection');
+      groupSelection.classList.remove('hidden');
+
+      document.getElementById('totalParsedCount').textContent = parsedWords.length;
+      document.getElementById('totalGroupCount').textContent = wordGroups.length;
+
+      const container = document.getElementById('groupList');
+      container.innerHTML = '';
+
+      wordGroups.forEach((group, index) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between bg-white border p-3 rounded-xl';
+        div.innerHTML = `
+          <div><span class="font-semibold">第 ${index + 1} 组</span> <span class="text-gray-500">(${group.length} 个)</span></div>
+          <button onclick="startGroupPractice(${index}, wordGroups._source, wordGroups._sourceIdx)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm">开始练习</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
